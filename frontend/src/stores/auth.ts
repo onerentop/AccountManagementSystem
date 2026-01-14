@@ -25,6 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function setup(password: string, confirmPassword: string) {
     const { data } = await authApi.setup(password, confirmPassword)
+    isInitialized.value = true
     return data
   }
 
