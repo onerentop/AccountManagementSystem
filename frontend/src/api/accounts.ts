@@ -51,17 +51,55 @@ export const accountApi = {
   import: (file: File, conflictStrategy = 'skip') => {
     const formData = new FormData()
     formData.append('file', file)
-    return api.post<ImportResult>(`/accounts/import?conflict_strategy=${conflictStrategy}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    // Let axios handle Content-Type automatically for FormData (includes boundary)
+    return api.post<ImportResult>(`/accounts/import?conflict_strategy=${conflictStrategy}`, formData)
   },
 
-  // Export
-  exportUrl: (format = 'excel', includePassword = false, accountIds?: string[]) => {
+  // Export - uses axios to include auth header
+  export: async (format = 'excel', includePassword = false, accountIds?: string[]) => {
     const params = new URLSearchParams()
     params.append('format', format)
     params.append('include_password', includePassword.toString())
     if (accountIds?.length) params.append('account_ids', accountIds.join(','))
-    return `/api/accounts/export/download?${params.toString()}`
+
+    const response = await api.get(`/accounts/export/download?${params.toString()}`, {
+      responseType: 'blob'
+    })
+
+    // Get filename from Content-Disposition header or use default
+    const contentDisposition = response.headers['content-disposition']
+    let filename = `accounts.${format === 'excel' ? 'xlsx' : format}`
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (match?.[1]) {
+        filename = match[1].replace(/['"]/g, '')
+      }
+    }
+
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
   },
+
+  // Batch operations
+  batchDelete: (accountIds: string[], hard = false) =>
+    api.post<{ deleted: number; failed: number }>(`/accounts/batch/delete?hard=${hard}`, { account_ids: accountIds }),
+
+  batchUpdateTags: (accountIds: string[], tagIds: string[], action: 'add' | 'remove' | 'set' = 'add') =>
+    api.post<{ updated: number; failed: number }>(
+      `/accounts/batch/tags?action=${action}`,
+      { account_ids: accountIds, tag_ids: tagIds }
+    ),
+
+  batchUpdate: (accountIds: string[], data: Partial<AccountUpdate>) =>
+    api.post<{ updated: number; failed: number }>('/accounts/batch/update', {
+      account_ids: accountIds,
+      ...data,
+    }),
 }

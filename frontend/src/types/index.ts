@@ -20,6 +20,7 @@ export interface Account {
   has_password: boolean
   has_totp: boolean
   tags: Tag[]
+  custom_fields?: Record<string, string>
   created_at: string
   updated_at: string
 }
@@ -44,6 +45,7 @@ export interface AccountCreate {
   recovery_email?: string
   totp_secret?: string
   tag_ids?: string[]
+  custom_fields?: Record<string, string>
 }
 
 export interface AccountUpdate extends Partial<AccountCreate> {}

@@ -100,6 +100,7 @@ class AccountService:
             family_group=data.family_group,
             recovery_email=data.recovery_email,
             totp_secret_encrypted=totp_encrypted,
+            custom_fields=data.custom_fields or {},
         )
 
         # Add tags

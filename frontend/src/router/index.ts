@@ -32,12 +32,15 @@ const router = createRouter({
 })
 
 // Navigation guard
+let statusChecked = false
+
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Check system status on first load
-  if (!authStore.isInitialized || authStore.isLocked) {
+  // Check system status only once on first load
+  if (!statusChecked) {
     await authStore.checkStatus()
+    statusChecked = true
   }
 
   // Redirect to setup if not initialized
@@ -45,8 +48,8 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'setup' })
   }
 
-  // Redirect to login if locked
-  if (to.meta.requiresAuth && authStore.isLocked) {
+  // Redirect to login if locked and trying to access protected route
+  if (to.meta.requiresAuth && authStore.isLocked && !authStore.token) {
     return next({ name: 'login' })
   }
 

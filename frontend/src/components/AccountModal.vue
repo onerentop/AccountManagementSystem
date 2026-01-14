@@ -162,6 +162,57 @@
           />
         </div>
 
+        <!-- Custom Fields -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              自定义属性
+            </label>
+            <button
+              type="button"
+              @click="addCustomField"
+              class="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 flex items-center gap-1"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              添加属性
+            </button>
+          </div>
+          <div class="space-y-2">
+            <div
+              v-for="(_, index) in customFieldsList"
+              :key="index"
+              class="flex items-center gap-2"
+            >
+              <input
+                v-model="customFieldsList[index].key"
+                type="text"
+                class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-sm"
+                placeholder="属性名"
+              />
+              <input
+                v-model="customFieldsList[index].value"
+                type="text"
+                class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-sm"
+                placeholder="属性值"
+              />
+              <button
+                type="button"
+                @click="removeCustomField(index)"
+                class="p-2 text-gray-400 hover:text-rose-500 transition-colors"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p v-if="customFieldsList.length === 0" class="text-sm text-gray-400 dark:text-gray-500">
+              暂无自定义属性
+            </p>
+          </div>
+        </div>
+
         <!-- Error -->
         <div v-if="error" class="text-rose-500 text-sm">{{ error }}</div>
 
@@ -191,6 +242,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useAccountStore } from '@/stores/accounts'
 import { useTagStore } from '@/stores/tags'
+import { parseApiError } from '@/utils/errorParser'
 import type { Account, AccountCreate, AccountUpdate } from '@/types'
 
 const props = defineProps<{
@@ -208,6 +260,7 @@ const tagStore = useTagStore()
 const loading = ref(false)
 const error = ref('')
 const showPassword = ref(false)
+const customFieldsList = ref<Array<{ key: string; value: string }>>([])
 
 const form = reactive<AccountCreate>({
   email: '',
@@ -221,6 +274,7 @@ const form = reactive<AccountCreate>({
   recovery_email: '',
   totp_secret: '',
   tag_ids: [],
+  custom_fields: {},
 })
 
 onMounted(() => {
@@ -234,6 +288,10 @@ onMounted(() => {
     form.family_group = props.account.family_group || ''
     form.recovery_email = props.account.recovery_email || ''
     form.tag_ids = props.account.tags.map(t => t.id)
+    // Initialize custom fields
+    if (props.account.custom_fields) {
+      customFieldsList.value = Object.entries(props.account.custom_fields).map(([key, value]) => ({ key, value }))
+    }
   }
 })
 
@@ -246,14 +304,47 @@ function toggleTag(tagId: string) {
   }
 }
 
+function addCustomField() {
+  customFieldsList.value.push({ key: '', value: '' })
+}
+
+function removeCustomField(index: number) {
+  customFieldsList.value.splice(index, 1)
+}
+
+function buildCustomFields(): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const field of customFieldsList.value) {
+    if (field.key.trim()) {
+      result[field.key.trim()] = field.value
+    }
+  }
+  return result
+}
+
 async function handleSubmit() {
   loading.value = true
   error.value = ''
 
   try {
+    // Build custom fields from list
+    const customFields = buildCustomFields()
+
+    // Clean up empty strings to avoid validation errors
+    const cleanData = (data: Record<string, any>) => {
+      const cleaned: Record<string, any> = {}
+      for (const [key, value] of Object.entries(data)) {
+        if (value === '' || value === undefined) {
+          continue // Skip empty strings and undefined
+        }
+        cleaned[key] = value
+      }
+      return cleaned
+    }
+
     if (props.account) {
       // Update
-      const updateData: AccountUpdate = { ...form }
+      const updateData: AccountUpdate = cleanData({ ...form, custom_fields: customFields }) as AccountUpdate
       if (!updateData.password) {
         delete updateData.password
       }
@@ -263,11 +354,11 @@ async function handleSubmit() {
       await accountStore.updateAccount(props.account.id, updateData)
     } else {
       // Create
-      await accountStore.createAccount(form)
+      await accountStore.createAccount(cleanData({ ...form, custom_fields: customFields }) as AccountCreate)
     }
     emit('saved')
   } catch (e: any) {
-    error.value = e.response?.data?.detail || '保存失败'
+    error.value = parseApiError(e, '保存失败')
   } finally {
     loading.value = false
   }

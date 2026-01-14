@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- Header -->
     <header class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-40">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="w-full px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
           <!-- Logo -->
           <div class="flex items-center gap-3">
@@ -64,7 +64,7 @@
       </div>
     </header>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="w-full px-4 sm:px-6 lg:px-8 py-6">
       <div class="flex gap-6">
         <!-- Sidebar -->
         <aside class="w-60 flex-shrink-0">
@@ -208,6 +208,8 @@ async function handleDelete(account: Account) {
     try {
       await accountStore.deleteAccount(account.id)
       showToast('删除成功', 'success')
+      // Refresh tag counts and stats
+      await Promise.all([tagStore.fetchTags(), accountStore.fetchStats()])
     } catch {
       showToast('删除失败', 'error')
     }
@@ -240,6 +242,7 @@ function handleSaved() {
   closeModal()
   accountStore.fetchAccounts()
   accountStore.fetchStats()
+  tagStore.fetchTags()
   showToast('保存成功', 'success')
 }
 
@@ -247,6 +250,7 @@ function handleImported() {
   showImportModal.value = false
   accountStore.fetchAccounts()
   accountStore.fetchStats()
+  tagStore.fetchTags()
   showToast('导入成功', 'success')
 }
 

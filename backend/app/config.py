@@ -17,10 +17,10 @@ class Settings(BaseSettings):
     DATA_DIR: Path = BASE_DIR / "data"
     DATABASE_PATH: Path = DATA_DIR / "accounts.db"
 
-    # Security
-    SECRET_KEY: str = os.urandom(32).hex()
+    # Security - Use a fixed secret key or load from env, otherwise JWT tokens will invalidate on restart
+    SECRET_KEY: str = os.environ.get("SECRET_KEY", "account-management-system-secret-key-2024-please-change-in-production")
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 30
+    JWT_EXPIRE_MINUTES: int = 1440  # 24 hours
     MASTER_PASSWORD_MIN_LENGTH: int = 8
 
     # Clipboard

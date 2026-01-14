@@ -18,6 +18,18 @@ export const useAccountStore = defineStore('accounts', () => {
   // Current editing account
   const currentAccount = ref<Account | null>(null)
 
+  // Selection state for batch operations
+  const selectedIds = ref<Set<string>>(new Set())
+
+  // Computed
+  const selectedCount = computed(() => selectedIds.value.size)
+  const isAllSelected = computed(() =>
+    accounts.value.length > 0 && selectedIds.value.size === accounts.value.length
+  )
+  const selectedAccounts = computed(() =>
+    accounts.value.filter(a => selectedIds.value.has(a.id))
+  )
+
   // Actions
   async function fetchAccounts(newFilters?: AccountFilters) {
     loading.value = true
@@ -95,6 +107,56 @@ export const useAccountStore = defineStore('accounts', () => {
     fetchAccounts()
   }
 
+  // Selection methods
+  function toggleSelect(id: string) {
+    if (selectedIds.value.has(id)) {
+      selectedIds.value.delete(id)
+    } else {
+      selectedIds.value.add(id)
+    }
+    // Trigger reactivity
+    selectedIds.value = new Set(selectedIds.value)
+  }
+
+  function toggleSelectAll() {
+    if (isAllSelected.value) {
+      selectedIds.value = new Set()
+    } else {
+      selectedIds.value = new Set(accounts.value.map(a => a.id))
+    }
+  }
+
+  function clearSelection() {
+    selectedIds.value = new Set()
+  }
+
+  function isSelected(id: string) {
+    return selectedIds.value.has(id)
+  }
+
+  // Batch operations
+  async function batchDelete() {
+    if (selectedIds.value.size === 0) return { deleted: 0, failed: 0 }
+    const ids = Array.from(selectedIds.value)
+    const { data } = await accountApi.batchDelete(ids)
+    clearSelection()
+    await fetchAccounts()
+    return data
+  }
+
+  async function batchUpdateTags(tagIds: string[], action: 'add' | 'remove' | 'set' = 'add') {
+    if (selectedIds.value.size === 0) return { updated: 0, failed: 0 }
+    const ids = Array.from(selectedIds.value)
+    const { data } = await accountApi.batchUpdateTags(ids, tagIds, action)
+    await fetchAccounts()
+    return data
+  }
+
+  async function exportAccounts(format = 'excel', includePassword = false) {
+    const ids = selectedIds.value.size > 0 ? Array.from(selectedIds.value) : undefined
+    await accountApi.export(format, includePassword, ids)
+  }
+
   return {
     accounts,
     total,
@@ -106,6 +168,16 @@ export const useAccountStore = defineStore('accounts', () => {
     sources,
     stats,
     currentAccount,
+    // Selection
+    selectedIds,
+    selectedCount,
+    isAllSelected,
+    selectedAccounts,
+    toggleSelect,
+    toggleSelectAll,
+    clearSelection,
+    isSelected,
+    // Actions
     fetchAccounts,
     fetchSources,
     fetchStats,
@@ -117,5 +189,9 @@ export const useAccountStore = defineStore('accounts', () => {
     setPage,
     setPageSize,
     resetFilters,
+    // Batch
+    batchDelete,
+    batchUpdateTags,
+    exportAccounts,
   }
 })

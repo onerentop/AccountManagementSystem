@@ -1,6 +1,6 @@
 """Pydantic schemas for accounts."""
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -57,6 +57,7 @@ class AccountBase(BaseModel):
     gpt_membership: Optional[str] = Field(None, max_length=20)
     family_group: Optional[str] = Field(None, max_length=100)
     recovery_email: Optional[EmailStr] = None
+    custom_fields: Optional[Dict[str, str]] = Field(default_factory=dict)
 
 
 class AccountCreate(AccountBase):
@@ -81,6 +82,7 @@ class AccountUpdate(BaseModel):
     recovery_email: Optional[EmailStr] = None
     totp_secret: Optional[str] = None
     tag_ids: Optional[List[str]] = None
+    custom_fields: Optional[Dict[str, str]] = None
 
 
 class AccountResponse(AccountBase):
@@ -135,3 +137,32 @@ class AccountExportRequest(BaseModel):
     format: str = Field(default="excel", pattern=r"^(excel|csv|json)$")
     include_password: bool = False
     account_ids: Optional[List[str]] = None
+
+
+class BatchDeleteRequest(BaseModel):
+    """Schema for batch delete request."""
+
+    account_ids: List[str] = Field(..., min_length=1)
+
+
+class BatchTagsRequest(BaseModel):
+    """Schema for batch tags update request."""
+
+    account_ids: List[str] = Field(..., min_length=1)
+    tag_ids: List[str] = Field(default_factory=list)
+
+
+class BatchUpdateRequest(BaseModel):
+    """Schema for batch update request."""
+
+    account_ids: List[str] = Field(..., min_length=1)
+    # Include optional update fields
+    email: Optional[EmailStr] = None
+    note: Optional[str] = None
+    sub2api: Optional[bool] = None
+    source: Optional[str] = Field(None, max_length=50)
+    browser: Optional[str] = Field(None, max_length=50)
+    gpt_membership: Optional[str] = Field(None, max_length=20)
+    family_group: Optional[str] = Field(None, max_length=100)
+    recovery_email: Optional[EmailStr] = None
+    tag_ids: Optional[List[str]] = None

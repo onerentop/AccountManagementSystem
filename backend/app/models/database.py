@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    JSON,
     create_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
@@ -49,6 +50,7 @@ class Account(Base):
     family_group: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     recovery_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     totp_secret_encrypted: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    custom_fields: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default=dict)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

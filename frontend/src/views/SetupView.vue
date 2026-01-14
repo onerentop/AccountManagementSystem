@@ -85,6 +85,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { parseApiError } from '@/utils/errorParser'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -127,7 +128,7 @@ async function handleSetup() {
     await authStore.login(password.value)
     router.push('/')
   } catch (e: any) {
-    error.value = e.response?.data?.detail || '设置失败，请重试'
+    error.value = parseApiError(e, '设置失败，请重试')
   } finally {
     loading.value = false
   }

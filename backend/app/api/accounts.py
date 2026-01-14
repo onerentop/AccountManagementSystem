@@ -17,6 +17,9 @@ from app.schemas import (
     AccountListResponse,
     AccountImportResult,
     TagBrief,
+    BatchDeleteRequest,
+    BatchTagsRequest,
+    BatchUpdateRequest,
 )
 from app.services.account_service import AccountService
 from app.services.crypto_service import crypto_service
@@ -41,6 +44,7 @@ def account_to_response(account) -> AccountResponse:
         has_password=account.password_encrypted is not None,
         has_totp=account.totp_secret_encrypted is not None,
         tags=[TagBrief(id=t.id, name=t.name, color=t.color) for t in account.tags],
+        custom_fields=account.custom_fields or {},
         created_at=account.created_at,
         updated_at=account.updated_at,
     )
@@ -102,6 +106,113 @@ async def get_stats(
     service = AccountService(db)
     return service.get_stats()
 
+
+# =====================
+# Batch Operations (must be before /{account_id} routes)
+# =====================
+
+@router.post("/batch/delete")
+async def batch_delete_accounts(
+    request: BatchDeleteRequest,
+    hard: bool = Query(False, description="Permanently delete"),
+    _: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete multiple accounts at once."""
+    service = AccountService(db)
+    deleted = 0
+    failed = 0
+
+    for account_id in request.account_ids:
+        if service.delete_account(account_id, hard_delete=hard):
+            deleted += 1
+        else:
+            failed += 1
+
+    return {"deleted": deleted, "failed": failed}
+
+
+@router.post("/batch/tags")
+async def batch_update_tags(
+    request: BatchTagsRequest,
+    action: str = Query("add", pattern=r"^(add|remove|set)$"),
+    _: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update tags for multiple accounts.
+
+    Actions:
+    - add: Add tags to accounts (keep existing)
+    - remove: Remove tags from accounts
+    - set: Replace all tags with given tags
+    """
+    service = AccountService(db)
+    updated = 0
+    failed = 0
+
+    for account_id in request.account_ids:
+        try:
+            account = service.get_account_by_id(account_id)
+            if not account:
+                failed += 1
+                continue
+
+            current_tag_ids = [t.id for t in account.tags]
+
+            if action == "add":
+                new_tag_ids = list(set(current_tag_ids + request.tag_ids))
+            elif action == "remove":
+                new_tag_ids = [t for t in current_tag_ids if t not in request.tag_ids]
+            else:  # set
+                new_tag_ids = request.tag_ids
+
+            service.update_account(account_id, AccountUpdate(tag_ids=new_tag_ids))
+            updated += 1
+        except Exception:
+            failed += 1
+
+    return {"updated": updated, "failed": failed}
+
+
+@router.post("/batch/update")
+async def batch_update_accounts(
+    request: BatchUpdateRequest,
+    _: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update multiple accounts with the same data."""
+    service = AccountService(db)
+    updated = 0
+    failed = 0
+
+    # Extract update data from request (excluding account_ids)
+    update_data = AccountUpdate(
+        email=request.email,
+        note=request.note,
+        sub2api=request.sub2api,
+        source=request.source,
+        browser=request.browser,
+        gpt_membership=request.gpt_membership,
+        family_group=request.family_group,
+        recovery_email=request.recovery_email,
+        tag_ids=request.tag_ids,
+    )
+
+    for account_id in request.account_ids:
+        try:
+            if service.update_account(account_id, update_data):
+                updated += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+
+    return {"updated": updated, "failed": failed}
+
+
+# =====================
+# Single Account Operations
+# =====================
 
 @router.get("/{account_id}", response_model=AccountResponse)
 async def get_account(
@@ -343,6 +454,13 @@ async def export_accounts(
 
     # Build data
     data = []
+    # Collect all custom field keys for column headers
+    all_custom_keys = set()
+    for acc in accounts:
+        if acc.custom_fields:
+            all_custom_keys.update(acc.custom_fields.keys())
+    all_custom_keys = sorted(all_custom_keys)
+
     for acc in accounts:
         row = {
             "账号": acc.email,
@@ -361,6 +479,10 @@ async def export_accounts(
         else:
             row["密码"] = "******" if acc.password_encrypted else ""
             row["2fa"] = "******" if acc.totp_secret_encrypted else ""
+
+        # Add custom fields as additional columns
+        for key in all_custom_keys:
+            row[f"自定义_{key}"] = (acc.custom_fields or {}).get(key, "")
 
         data.append(row)
 

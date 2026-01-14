@@ -51,6 +51,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { parseApiError } from '@/utils/errorParser'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -72,7 +73,7 @@ async function handleLogin() {
     await authStore.login(password.value)
     router.push('/')
   } catch (e: any) {
-    error.value = e.response?.data?.detail || '密码错误'
+    error.value = parseApiError(e, '密码错误')
   } finally {
     loading.value = false
   }

@@ -21,4 +21,7 @@ from app.schemas.account import (
     AccountImportRequest,
     AccountImportResult,
     AccountExportRequest,
+    BatchDeleteRequest,
+    BatchTagsRequest,
+    BatchUpdateRequest,
 )
