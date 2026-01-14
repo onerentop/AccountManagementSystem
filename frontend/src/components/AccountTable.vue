@@ -117,13 +117,13 @@
             <td class="px-3 py-2">
               <div class="flex items-center gap-2">
                 <button
-                  @click="$emit('copy', account.email, '账号')"
+                  @click="copyToClipboard(account.email, '账号')"
                   class="text-sm font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                 >
                   {{ account.email }}
                 </button>
                 <button
-                  @click="$emit('copy', account.email, '账号')"
+                  @click="copyToClipboard(account.email, '账号')"
                   class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                   title="复制账号"
                 >
@@ -208,7 +208,7 @@
                 </span>
                 <button
                   v-if="account.recovery_email"
-                  @click="$emit('copy', account.recovery_email, '辅助邮箱')"
+                  @click="copyToClipboard(account.recovery_email, '辅助邮箱')"
                   class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                   title="复制辅助邮箱"
                 >
@@ -221,31 +221,74 @@
 
             <!-- Source -->
             <td class="px-3 py-2">
-              <span class="text-sm text-gray-600 dark:text-gray-400">
-                {{ account.source || '-' }}
-              </span>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-600 dark:text-gray-400">
+                  {{ account.source || '-' }}
+                </span>
+                <button
+                  v-if="account.source"
+                  @click="copyToClipboard(account.source, '来源')"
+                  class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  title="复制来源"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
             </td>
 
             <!-- Tags -->
             <td class="px-3 py-2">
-              <div class="flex flex-wrap gap-1">
-                <span
-                  v-for="tag in account.tags"
-                  :key="tag.id"
-                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                  :style="{ backgroundColor: tag.color + '20', color: tag.color }"
+              <div class="relative">
+                <div
+                  @click="startEditTag(account.id, $event)"
+                  class="flex flex-wrap gap-1 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-1 -m-1 min-h-[28px] items-center"
+                  title="点击设置标签"
                 >
-                  {{ tag.name }}
-                </span>
-                <span v-if="account.tags.length === 0" class="text-sm text-gray-400">-</span>
+                  <span
+                    v-for="tag in account.tags"
+                    :key="tag.id"
+                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                    :style="{ backgroundColor: tag.color + '20', color: tag.color }"
+                  >
+                    {{ tag.name }}
+                  </span>
+                  <span v-if="account.tags.length === 0" class="text-sm text-gray-400">点击添加</span>
+                  <svg class="w-3 h-3 text-gray-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
             </td>
 
             <!-- Note -->
             <td class="px-3 py-2">
-              <span class="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px] block">
-                {{ account.note || '-' }}
-              </span>
+              <div v-if="editingNoteId === account.id" class="flex items-center gap-1">
+                <input
+                  ref="noteInputRef"
+                  v-model="editingNoteValue"
+                  type="text"
+                  class="w-full px-2 py-1 text-sm border border-primary-500 rounded focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="输入备注..."
+                  @keyup.enter="saveNote(account.id)"
+                  @keyup.escape="cancelEditNote"
+                  @blur="saveNote(account.id)"
+                />
+              </div>
+              <div
+                v-else
+                @click="startEditNote(account)"
+                class="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-1 -m-1 min-h-[28px] flex items-center"
+                title="点击编辑备注"
+              >
+                <span class="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px]">
+                  {{ account.note || '点击添加' }}
+                </span>
+                <svg class="w-3 h-3 text-gray-400 ml-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </div>
             </td>
 
             <!-- Custom Fields -->
@@ -405,11 +448,62 @@
         </div>
       </div>
     </div>
+
+    <!-- Inline Tag Dropdown (Teleport to body to avoid overflow issues) -->
+    <Teleport to="body">
+      <div v-if="editingTagId && editingTagAccount">
+        <!-- Backdrop -->
+        <div
+          class="fixed inset-0 z-[9998]"
+          @click="closeTagDropdown"
+        ></div>
+        <!-- Dropdown -->
+        <div
+          class="fixed z-[9999] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 min-w-[180px] max-h-[300px] overflow-y-auto"
+          :style="tagDropdownStyle"
+        >
+          <div class="px-3 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 mb-1">
+            选择标签
+          </div>
+          <div v-if="tagStore.tags.length === 0" class="px-3 py-2 text-sm text-gray-400">
+            暂无标签
+          </div>
+          <button
+            v-for="tag in tagStore.tags"
+            :key="tag.id"
+            @click="toggleAccountTag(editingTagAccount!, tag.id)"
+            class="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+          >
+            <span
+              class="w-3 h-3 rounded-full flex-shrink-0"
+              :style="{ backgroundColor: tag.color }"
+            ></span>
+            <span class="flex-1">{{ tag.name }}</span>
+            <svg
+              v-if="editingTagAccount!.tags.some(t => t.id === tag.id)"
+              class="w-4 h-4 text-primary-600"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+          </button>
+          <div class="border-t border-gray-200 dark:border-gray-700 mt-1 pt-1">
+            <button
+              @click="closeTagDropdown"
+              class="w-full px-3 py-1.5 text-left text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, inject } from 'vue'
+import { ref, inject, nextTick, computed } from 'vue'
 import { useAccountStore } from '@/stores/accounts'
 import { useTagStore } from '@/stores/tags'
 import { parseApiError } from '@/utils/errorParser'
@@ -418,12 +512,26 @@ import type { Account } from '@/types'
 defineEmits<{
   (e: 'edit', account: Account): void
   (e: 'delete', account: Account): void
-  (e: 'copy', text: string, type: string): void
 }>()
+
+// Inline editing state
+const editingNoteId = ref<string | null>(null)
+const editingNoteValue = ref('')
+const noteInputRef = ref<HTMLInputElement | null>(null)
+
+// Inline tag editing state
+const editingTagId = ref<string | null>(null)
+const tagDropdownStyle = ref<Record<string, string>>({})
 
 const accountStore = useAccountStore()
 const tagStore = useTagStore()
 const showToast = inject('showToast') as (msg: string, type?: 'success' | 'error' | 'info') => void
+
+// Get current editing account for tag dropdown (must be after accountStore)
+const editingTagAccount = computed(() => {
+  if (!editingTagId.value) return null
+  return accountStore.accounts.find(a => a.id === editingTagId.value) || null
+})
 
 const visiblePasswords = ref<Record<string, string>>({})
 const visibleTotps = ref<Record<string, string>>({})
@@ -453,15 +561,12 @@ async function copyPassword(accountId: string) {
       password = await accountStore.getPassword(accountId) || ''
     }
     if (password) {
-      await navigator.clipboard.writeText(password)
-      showToast('密码已复制，30秒后自动清除', 'success')
-
-      setTimeout(async () => {
-        const current = await navigator.clipboard.readText()
-        if (current === password) {
-          await navigator.clipboard.writeText('')
-        }
-      }, 30000)
+      const success = await copyText(password)
+      if (success) {
+        showToast('密码已复制', 'success')
+      } else {
+        showToast('复制失败', 'error')
+      }
     }
   } catch {
     showToast('复制失败', 'error')
@@ -490,15 +595,12 @@ async function copyTotp(accountId: string) {
       totp = await accountStore.getTotp(accountId) || ''
     }
     if (totp) {
-      await navigator.clipboard.writeText(totp)
-      showToast('2FA已复制，30秒后自动清除', 'success')
-
-      setTimeout(async () => {
-        const current = await navigator.clipboard.readText()
-        if (current === totp) {
-          await navigator.clipboard.writeText('')
-        }
-      }, 30000)
+      const success = await copyText(totp)
+      if (success) {
+        showToast('2FA已复制', 'success')
+      } else {
+        showToast('复制失败', 'error')
+      }
     }
   } catch {
     showToast('复制失败', 'error')
@@ -512,6 +614,123 @@ function toggleBatchTag(tagId: string) {
     selectedBatchTags.value.add(tagId)
   }
   selectedBatchTags.value = new Set(selectedBatchTags.value)
+}
+
+// Copy to clipboard with fallback for HTTP
+async function copyText(text: string): Promise<boolean> {
+  // 优先使用 Clipboard API
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // fallback below
+    }
+  }
+  // Fallback: 使用 execCommand
+  try {
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-9999px'
+    textArea.style.top = '-9999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    const success = document.execCommand('copy')
+    document.body.removeChild(textArea)
+    return success
+  } catch {
+    return false
+  }
+}
+
+// Copy to clipboard with null check
+async function copyToClipboard(text: string | null | undefined, type: string) {
+  if (!text) {
+    showToast(`${type}为空，无法复制`, 'info')
+    return
+  }
+  const success = await copyText(text)
+  if (success) {
+    showToast(`${type}已复制`, 'success')
+  } else {
+    showToast('复制失败', 'error')
+  }
+}
+
+// Inline note editing
+function startEditNote(account: Account) {
+  editingNoteId.value = account.id
+  editingNoteValue.value = account.note || ''
+  nextTick(() => {
+    noteInputRef.value?.focus()
+  })
+}
+
+async function saveNote(accountId: string) {
+  try {
+    await accountStore.updateAccount(accountId, { note: editingNoteValue.value || undefined })
+    showToast('备注已更新', 'success')
+  } catch (e) {
+    showToast(parseApiError(e, '更新备注失败'), 'error')
+  } finally {
+    editingNoteId.value = null
+  }
+}
+
+function cancelEditNote() {
+  editingNoteId.value = null
+  editingNoteValue.value = ''
+}
+
+// Inline tag editing
+function startEditTag(accountId: string, event: MouseEvent) {
+  const target = event.currentTarget as HTMLElement
+  if (target) {
+    const rect = target.getBoundingClientRect()
+    const dropdownHeight = 300 // max-h-[300px]
+    const viewportHeight = window.innerHeight
+    const spaceBelow = viewportHeight - rect.bottom
+    const spaceAbove = rect.top
+
+    // 如果下方空间不够且上方空间更大，就向上弹出
+    const openUp = spaceBelow < dropdownHeight && spaceAbove > spaceBelow
+
+    if (openUp) {
+      tagDropdownStyle.value = {
+        left: rect.left + 'px',
+        bottom: (viewportHeight - rect.top + 4) + 'px'
+      }
+    } else {
+      tagDropdownStyle.value = {
+        left: rect.left + 'px',
+        top: (rect.bottom + 4) + 'px'
+      }
+    }
+  }
+  editingTagId.value = accountId
+}
+
+function closeTagDropdown() {
+  editingTagId.value = null
+}
+
+async function toggleAccountTag(account: Account, tagId: string) {
+  const currentTagIds = account.tags.map(t => t.id)
+  const hasTag = currentTagIds.includes(tagId)
+  const newTagIds = hasTag
+    ? currentTagIds.filter(id => id !== tagId)
+    : [...currentTagIds, tagId]
+
+  try {
+    await accountStore.updateAccount(account.id, { tag_ids: newTagIds })
+    showToast('标签已更新', 'success')
+    // Refresh tag counts
+    await tagStore.fetchTags()
+  } catch (e) {
+    showToast(parseApiError(e, '更新标签失败'), 'error')
+  }
 }
 
 async function handleBatchTag() {

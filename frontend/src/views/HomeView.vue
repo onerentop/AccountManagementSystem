@@ -123,7 +123,6 @@
           <AccountTable
             @edit="handleEdit"
             @delete="handleDelete"
-            @copy="handleCopy"
           />
         </main>
       </div>
@@ -213,23 +212,6 @@ async function handleDelete(account: Account) {
     } catch {
       showToast('删除失败', 'error')
     }
-  }
-}
-
-async function handleCopy(text: string, type: string) {
-  try {
-    await navigator.clipboard.writeText(text)
-    showToast(`${type}已复制`, 'success')
-
-    // Clear clipboard after 30 seconds
-    setTimeout(async () => {
-      const current = await navigator.clipboard.readText()
-      if (current === text) {
-        await navigator.clipboard.writeText('')
-      }
-    }, 30000)
-  } catch {
-    showToast('复制失败', 'error')
   }
 }
 
