@@ -56,7 +56,7 @@ case $ACTION in
         echo -e "${YELLOW}Starting services...${NC}"
         docker-compose up -d --build
         echo -e "${GREEN}Services started!${NC}"
-        echo -e "${GREEN}Access the application at: http://localhost:${PORT:-8080}${NC}"
+        echo -e "${GREEN}Access the application at: http://localhost:${PORT:-8090}${NC}"
         ;;
     "down")
         echo -e "${YELLOW}Stopping services...${NC}"

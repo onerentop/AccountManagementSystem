@@ -43,7 +43,7 @@ if "%ACTION%"=="up" (
     docker-compose up -d --build
     echo.
     echo Services started!
-    echo Access the application at: http://localhost:8080
+    echo Access the application at: http://localhost:8090
     goto :end
 )
 
