@@ -12,7 +12,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY:-your-secure-secret-key-change-in-production}
     volumes:
-      - ./data:/app/data
+      - ./data:/data
     networks:
       - app-network
     healthcheck:
