@@ -112,11 +112,11 @@
               @click="toggleTag(tag.id)"
               :class="[
                 'px-3 py-1 rounded-full text-sm transition-colors',
-                form.tag_ids.includes(tag.id)
+                (form.tag_ids || []).includes(tag.id)
                   ? 'text-white'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               ]"
-              :style="form.tag_ids.includes(tag.id) ? { backgroundColor: tag.color } : {}"
+              :style="(form.tag_ids || []).includes(tag.id) ? { backgroundColor: tag.color } : {}"
             >
               {{ tag.name }}
             </button>

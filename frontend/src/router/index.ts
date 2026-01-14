@@ -34,7 +34,7 @@ const router = createRouter({
 // Navigation guard
 let statusChecked = false
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
 
   // Check system status only once on first load
